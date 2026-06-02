@@ -28,11 +28,13 @@ RUN apt-get update && \
     apt-get autoremove -y && rm -rf /var/lib/apt/lists/* && apt-get clean -y
 
 RUN --mount=type=cache,target=/root/.cache/pip \
-    git clone https://github.com/4warddesigns-pixel/stable-diffusion-webui.git && \
+    git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git && \
     cd stable-diffusion-webui && \
     git reset --hard ${A1111_RELEASE} && \
+    pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install xformers && \
-    pip install -r requirements_versions.txt
+    pip install -r requirements_versions.txt && \
+    python -c "from launch import prepare_environment; prepare_environment()" --skip-torch-cuda-test
     
 COPY --from=download /model.safetensors /model.safetensors
 
