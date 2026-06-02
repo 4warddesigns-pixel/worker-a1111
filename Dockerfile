@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install xformers && \
     pip install -r requirements_versions.txt && \
-    python -c "from launch import prepare_environment; prepare_environment()" --skip-torch-cuda-test
+    python -c "from launch import prepare_environment; prepare_environment()" --skip-torch-cuda-test --skip-git-pull
     
 COPY --from=download /model.safetensors /model.safetensors
 
