@@ -1,15 +1,17 @@
-# TEST DOCKERFILE — validates the core A1111 build step in isolation
-# Skips: model download (Stage 1), handler src, requirements.txt
-# Purpose: fast feedback loop — confirm git clone + prepare_environment passes
-#          before running the full slow build
-#
-# Build command:
-#   docker build -f "Test Dockerfile" . --progress=plain --no-cache
-#
-# Success: last printed line will be --- CORE BUILD STEP PASSED ---
-# Failure: docker will print the exact line that errored and exit non-zero
+# ---------------------------------------------------------------------------- #
+#                         Stage 1: Download the models                         #
+# ---------------------------------------------------------------------------- #
+FROM alpine/git:2.43.0 as download
 
-FROM python:3.10.14-slim
+# NOTE: CivitAI usually requires an API token, so you need to add it in the header
+#       of the wget command if you're using a model from CivitAI.
+RUN apk add --no-cache wget && \
+    wget -q -O /model.safetensors https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v6.safetensors
+
+# ---------------------------------------------------------------------------- #
+#                        Stage 2: Build the final image                        #
+# ---------------------------------------------------------------------------- #
+FROM python:3.10.14-slim as build_final_image
 
 ARG A1111_RELEASE=v1.9.3
 
@@ -27,8 +29,6 @@ RUN apt-get update && \
     apt install -y \
     fonts-dejavu-core rsync git jq moreutils aria2 wget libgoogle-perftools-dev libtcmalloc-minimal4 procps libgl1 libglib2.0-0 && \
     apt-get autoremove -y && rm -rf /var/lib/apt/lists/* && apt-get clean -y
-
-RUN echo "--- APT STEP PASSED ---"
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git && \
@@ -55,4 +55,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     export BLIP_COMMIT_HASH=$(git -C repositories/BLIP rev-parse HEAD) && \
     python -c "from launch import prepare_environment; prepare_environment()" --skip-torch-cuda-test --skip-git-pull
 
-RUN echo "--- CORE BUILD STEP PASSED ---"
+COPY --from=download /model.safetensors /model.safetensors
+
+# install dependencies
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements.txt
+
+COPY test_input.json .
+
+ADD src .
+
+RUN chmod +x /start.sh
+CMD /start.sh
