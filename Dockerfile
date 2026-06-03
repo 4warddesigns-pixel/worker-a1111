@@ -7,6 +7,7 @@ FROM alpine/git:2.43.0 as download
 #       of the wget command if you're using a model from CivitAI.
 RUN apk add --no-cache wget && \
     wget -q -O /model.safetensors https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v6.safetensors
+
 # ---------------------------------------------------------------------------- #
 #                        Stage 2: Build the final image                        #
 # ---------------------------------------------------------------------------- #
@@ -36,10 +37,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip wheel && \
     pip install "setuptools==67.8.0" && \
     pip install --no-build-isolation "git+https://github.com/openai/CLIP.git@d50d76daa670286dd6cacf3bcd80b5e4823fc8e1" && \
-    pip install --upgrade setuptools && \
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install xformers==0.0.29.post1 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install -r requirements_versions.txt && \
+    pip install "setuptools==67.8.0" && \
     mkdir -p repositories && \
     git clone --depth 1 https://github.com/AUTOMATIC1111/stable-diffusion-webui-assets repositories/stable-diffusion-webui-assets && \
     git clone --depth 1 https://github.com/CompVis/stable-diffusion repositories/stable-diffusion-stability-ai && \
