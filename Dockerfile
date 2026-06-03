@@ -34,7 +34,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git && \
     cd stable-diffusion-webui && \
     git reset --hard ${A1111_RELEASE} && \
-    pip install --upgrade pip && \
+    pip install --upgrade pip setuptools wheel && \
+    pip install --no-build-isolation "git+https://github.com/openai/CLIP.git@d50d76daa670286dd6cacf3bcd80b5e4823fc8e1" && \
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install xformers==0.0.29.post1 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install -r requirements_versions.txt && \
