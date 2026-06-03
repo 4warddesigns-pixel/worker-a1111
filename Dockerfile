@@ -46,9 +46,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git clone --depth 1 https://github.com/CompVis/stable-diffusion repositories/stable-diffusion-stability-ai && \
     export STABLE_DIFFUSION_COMMIT_HASH=$(git -C repositories/stable-diffusion-stability-ai rev-parse HEAD) && \
     git clone --depth 1 https://github.com/Stability-AI/generative-models repositories/generative-models && \
+    export STABLE_DIFFUSION_XL_COMMIT_HASH=$(git -C repositories/generative-models rev-parse HEAD) && \
     git clone --depth 1 https://github.com/crowsonkb/k-diffusion repositories/k-diffusion && \
+    export K_DIFFUSION_COMMIT_HASH=$(git -C repositories/k-diffusion rev-parse HEAD) && \
     git clone --depth 1 https://github.com/sczhou/CodeFormer repositories/CodeFormer && \
+    export CODEFORMER_COMMIT_HASH=$(git -C repositories/CodeFormer rev-parse HEAD) && \
     git clone --depth 1 https://github.com/salesforce/BLIP repositories/BLIP && \
+    export BLIP_COMMIT_HASH=$(git -C repositories/BLIP rev-parse HEAD) && \
     python -c "from launch import prepare_environment; prepare_environment()" --skip-torch-cuda-test --skip-git-pull
 
 RUN echo "--- CORE BUILD STEP PASSED ---"
