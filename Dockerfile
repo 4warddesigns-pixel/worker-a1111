@@ -37,11 +37,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install xformers && \
     pip install -r requirements_versions.txt && \
+    mkdir -p repositories && \
+    git clone --depth 1 https://github.com/AUTOMATIC1111/stable-diffusion-webui-assets repositories/stable-diffusion-webui-assets && \
+    git clone --depth 1 https://github.com/Stability-AI/stablediffusion repositories/stable-diffusion-stability-ai && \
+    git clone --depth 1 https://github.com/Stability-AI/generative-models repositories/generative-models && \
+    git clone --depth 1 https://github.com/crowsonkb/k-diffusion repositories/k-diffusion && \
+    git clone --depth 1 https://github.com/sczhou/CodeFormer repositories/CodeFormer && \
+    git clone --depth 1 https://github.com/salesforce/BLIP repositories/BLIP && \
     python -c "from launch import prepare_environment; prepare_environment()" --skip-torch-cuda-test --skip-git-pull
 
 RUN echo "--- CORE BUILD STEP PASSED ---"
-
-ADD src .
-
-RUN chmod +x /start.sh
-CMD /start.sh
