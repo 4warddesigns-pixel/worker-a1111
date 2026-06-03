@@ -18,7 +18,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     ROOT=/stable-diffusion-webui \
     PYTHONUNBUFFERED=1 \
     GIT_TERMINAL_PROMPT=0 \
-    GIT_ASKPASS=/bin/echo
+    GIT_ASKPASS=/bin/echo \
+    STABLE_DIFFUSION_REPO=https://github.com/CompVis/stable-diffusion
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -35,11 +36,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git reset --hard ${A1111_RELEASE} && \
     pip install --upgrade pip && \
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --extra-index-url https://download.pytorch.org/whl/cu124 && \
-    pip install xformers && \
+    pip install xformers==0.0.29.post1 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install -r requirements_versions.txt && \
     mkdir -p repositories && \
     git clone --depth 1 https://github.com/AUTOMATIC1111/stable-diffusion-webui-assets repositories/stable-diffusion-webui-assets && \
-    git clone --depth 1 https://github.com/Stability-AI/stablediffusion repositories/stable-diffusion-stability-ai && \
+    git clone --depth 1 https://github.com/CompVis/stable-diffusion repositories/stable-diffusion-stability-ai && \
+    export STABLE_DIFFUSION_COMMIT_HASH=$(git -C repositories/stable-diffusion-stability-ai rev-parse HEAD) && \
     git clone --depth 1 https://github.com/Stability-AI/generative-models repositories/generative-models && \
     git clone --depth 1 https://github.com/crowsonkb/k-diffusion repositories/k-diffusion && \
     git clone --depth 1 https://github.com/sczhou/CodeFormer repositories/CodeFormer && \
