@@ -3,10 +3,14 @@
 # ---------------------------------------------------------------------------- #
 FROM alpine/git:2.43.0 as download
 
-# NOTE: CivitAI usually requires an API token, so you need to add it in the header
-#       of the wget command if you're using a model from CivitAI.
+ARG HF_TOKEN
+
+# HF_TOKEN required — HuggingFace now requires auth to download models.
+# Add HF_TOKEN as a GitHub Actions secret, then pass via --build-arg in workflow.
+# Long term: host model on own HuggingFace account (see before-final-build.txt item 6).
 RUN apk add --no-cache wget && \
-    wget -q -O /model.safetensors https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v6.safetensors
+    wget -q --header="Authorization: Bearer ${HF_TOKEN}" \
+    -O /model.safetensors https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v6.safetensors
 
 # ---------------------------------------------------------------------------- #
 #                        Stage 2: Build the final image                        #
@@ -41,8 +45,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install xformers==0.0.29.post1 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install -r requirements_versions.txt && \
     pip install "setuptools==67.8.0" && \
-    pip install "git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers" --no-deps && \
     mkdir -p repositories && \
+    git clone --depth 1 https://github.com/CompVis/taming-transformers.git repositories/taming-transformers && \
+    pip install -e repositories/taming-transformers --no-deps && \
     git clone --depth 1 https://github.com/AUTOMATIC1111/stable-diffusion-webui-assets repositories/stable-diffusion-webui-assets && \
     git clone --depth 1 https://github.com/CompVis/stable-diffusion repositories/stable-diffusion-stability-ai && \
     export STABLE_DIFFUSION_COMMIT_HASH=$(git -C repositories/stable-diffusion-stability-ai rev-parse HEAD) && \
