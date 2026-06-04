@@ -25,7 +25,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     GIT_TERMINAL_PROMPT=0 \
     GIT_ASKPASS=/bin/echo \
-    STABLE_DIFFUSION_REPO=https://github.com/CompVis/stable-diffusion
+    STABLE_DIFFUSION_REPO=https://github.com/CompVis/stable-diffusion \
+    PYTHONPATH="/stable-diffusion-webui/repositories/taming-transformers"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -47,7 +48,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install "setuptools==67.8.0" && \
     mkdir -p repositories && \
     git clone --depth 1 https://github.com/CompVis/taming-transformers.git repositories/taming-transformers && \
-    pip install -e repositories/taming-transformers --no-deps && \
     git clone --depth 1 https://github.com/AUTOMATIC1111/stable-diffusion-webui-assets repositories/stable-diffusion-webui-assets && \
     git clone --depth 1 https://github.com/CompVis/stable-diffusion repositories/stable-diffusion-stability-ai && \
     export STABLE_DIFFUSION_COMMIT_HASH=$(git -C repositories/stable-diffusion-stability-ai rev-parse HEAD) && \
