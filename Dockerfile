@@ -41,6 +41,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install xformers==0.0.29.post1 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install -r requirements_versions.txt && \
     pip install "setuptools==67.8.0" && \
+    pip install "taming-transformers==0.0.1" --no-deps && \
     mkdir -p repositories && \
     git clone --depth 1 https://github.com/AUTOMATIC1111/stable-diffusion-webui-assets repositories/stable-diffusion-webui-assets && \
     git clone --depth 1 https://github.com/CompVis/stable-diffusion repositories/stable-diffusion-stability-ai && \
