@@ -29,3 +29,4 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/worker-a1111:latest
             ${{ secrets.DOCKER_USERNAME }}/worker-a1111:${{ github.sha }}
           network: host
+          build-args: HF_TOKEN=${{ secrets.HF_TOKEN }}
