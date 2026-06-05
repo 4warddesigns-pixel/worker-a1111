@@ -96,14 +96,15 @@ RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git && \
 RUN echo "--- A1111 REQUIREMENTS STEP PASSED ---"
 
 # Clone repositories A1111 needs at runtime.
-# stable-diffusion-stability-ai: cloned from CompVis (same code, Stability-AI is private).
+# stable-diffusion-stability-ai: cloned from CompVis/latent-diffusion (parent framework,
+#   has full ldm including ldm/modules/midas/ — CompVis/stable-diffusion lacks midas).
 #   Remote URL spoofed to Stability-AI so prepare_environment URL check passes.
 # generative-models: not needed for SD 1.x — stub git repo with correct remote
 #   so prepare_environment URL check passes without fetching.
 RUN cd stable-diffusion-webui && \
     mkdir -p repositories && \
     git clone --depth 1 https://github.com/AUTOMATIC1111/stable-diffusion-webui-assets repositories/stable-diffusion-webui-assets && \
-    git clone --depth 1 https://github.com/CompVis/stable-diffusion repositories/stable-diffusion-stability-ai && \
+    git clone --depth 1 https://github.com/CompVis/latent-diffusion repositories/stable-diffusion-stability-ai && \
     git -C repositories/stable-diffusion-stability-ai remote set-url origin https://github.com/Stability-AI/stablediffusion && \
     mkdir -p repositories/generative-models && \
     git -C repositories/generative-models init && \
@@ -115,10 +116,9 @@ RUN cd stable-diffusion-webui && \
 RUN echo "--- REPOSITORIES STEP PASSED ---"
 
 # ldm is made importable via PYTHONPATH (set in ENV above).
-# CompVis/stable-diffusion was designed for sys.path usage — it has no setup.py/
-# pyproject.toml, so pip/uv install -e does not register ldm in site-packages.
-# PYTHONPATH points Python directly at the repo root so "import ldm" resolves.
-# This is how A1111's own paths.py makes ldm importable at runtime.
+# We clone CompVis/latent-diffusion (not stable-diffusion) because it has the full
+# ldm package including ldm/modules/midas/ which A1111 imports unconditionally.
+# CompVis/stable-diffusion lacks midas. PYTHONPATH points Python at the repo root.
 
 # prepare_environment() call removed — we've done everything it would do:
 #   - torch, xformers, CLIP, dctorch, latent-diffusion: installed via uv above
