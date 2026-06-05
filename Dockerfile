@@ -70,6 +70,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git clone --depth 1 https://github.com/crowsonkb/k-diffusion repositories/k-diffusion && \
     git clone --depth 1 https://github.com/sczhou/CodeFormer repositories/CodeFormer && \
     git clone --depth 1 https://github.com/salesforce/BLIP repositories/BLIP && \
+    pip install --no-build-isolation "https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip" && \
     python -c "from launch import prepare_environment; prepare_environment()" --skip-torch-cuda-test --skip-git-pull
 
 RUN echo "--- CORE BUILD STEP PASSED ---"
