@@ -68,12 +68,19 @@ RUN uv pip install xformers==0.0.29.post3
 
 RUN echo "--- TORCH STEP PASSED ---"
 
-# Pre-install packages A1111 prepare_environment installs poorly with old pip:
-#   - CLIP: old setup.py uses pkg_resources — uv handles this cleanly
-#   - dctorch: k-diffusion imports it, not in requirements.txt
-#   - taming-transformers + latent-diffusion: make ldm importable as a real package
+# Pre-install packages A1111 prepare_environment installs poorly:
+#   - CLIP: old setup.py does "import pkg_resources" at line 3.
+#     uv (like pip) creates an isolated build env for source packages — that env
+#     gets its own setuptools independently of our 68.2.2 pin, and newer setuptools
+#     breaks pkg_resources in build subprocesses.
+#     --no-build-isolation forces uv to use the current venv (our pinned 68.2.2)
+#     instead of creating a fresh isolated env. Pin + no-isolation = pkg_resources works.
+RUN uv pip install --no-build-isolation \
+    "https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip"
+
+#   - dctorch, taming-transformers, latent-diffusion: no old setup.py issues,
+#     install normally without --no-build-isolation
 RUN uv pip install \
-    "https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip" \
     dctorch \
     git+https://github.com/CompVis/taming-transformers.git \
     git+https://github.com/CompVis/latent-diffusion.git
