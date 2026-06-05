@@ -78,12 +78,12 @@ RUN echo "--- TORCH STEP PASSED ---"
 RUN uv pip install --no-build-isolation \
     "https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip"
 
-#   - dctorch, taming-transformers, latent-diffusion: no old setup.py issues,
-#     install normally without --no-build-isolation
+#   - dctorch, taming-transformers: install normally
+#   - latent-diffusion: installed from local clone after repos step (see below)
+#     remote pip install of latent-diffusion doesn't reliably put ldm in site-packages
 RUN uv pip install \
     dctorch \
-    git+https://github.com/CompVis/taming-transformers.git \
-    git+https://github.com/CompVis/latent-diffusion.git
+    git+https://github.com/CompVis/taming-transformers.git
 
 RUN echo "--- PRE-INSTALL STEP PASSED ---"
 
@@ -113,6 +113,11 @@ RUN cd stable-diffusion-webui && \
     git clone --depth 1 https://github.com/salesforce/BLIP repositories/BLIP
 
 RUN echo "--- REPOSITORIES STEP PASSED ---"
+
+# Install ldm from the local CompVis/stable-diffusion clone — same code as
+# latent-diffusion but guaranteed to have ldm/ in site-packages since we control
+# the source. Remote pip install of latent-diffusion doesn't reliably expose ldm.
+RUN uv pip install -e stable-diffusion-webui/repositories/stable-diffusion-stability-ai
 
 # prepare_environment() call removed — we've done everything it would do:
 #   - torch, xformers, CLIP, dctorch, latent-diffusion: installed via uv above
