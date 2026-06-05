@@ -115,6 +115,15 @@ RUN cd stable-diffusion-webui && \
 
 RUN echo "--- REPOSITORIES STEP PASSED ---"
 
+# ldm/modules/midas was added by Stability-AI for SD2 depth conditioning and only
+# lives in their now-private repo. Neither CompVis/stable-diffusion nor
+# CompVis/latent-diffusion has it. A1111 imports it unconditionally at module level
+# but never calls it for SD1.x (Deliberate v6) generation — a stub satisfies the import.
+RUN mkdir -p stable-diffusion-webui/repositories/stable-diffusion-stability-ai/ldm/modules/midas && \
+    touch stable-diffusion-webui/repositories/stable-diffusion-stability-ai/ldm/modules/midas/__init__.py
+
+RUN echo "--- MIDAS STUB CREATED ---"
+
 # ldm is made importable via PYTHONPATH (set in ENV above).
 # We clone CompVis/latent-diffusion (not stable-diffusion) because it has the full
 # ldm package including ldm/modules/midas/ which A1111 imports unconditionally.
