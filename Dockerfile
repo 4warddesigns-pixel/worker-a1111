@@ -30,7 +30,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     GIT_TERMINAL_PROMPT=0 \
     GIT_ASKPASS=/bin/echo \
-    PATH="/opt/venv/bin:${PATH}"
+    PATH="/opt/venv/bin:${PATH}" \
+    PYTHONPATH="/stable-diffusion-webui/repositories/stable-diffusion-stability-ai"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -79,8 +80,7 @@ RUN uv pip install --no-build-isolation \
     "https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip"
 
 #   - dctorch, taming-transformers: install normally
-#   - latent-diffusion: installed from local clone after repos step (see below)
-#     remote pip install of latent-diffusion doesn't reliably put ldm in site-packages
+#   - ldm: NOT installed as a package — made importable via PYTHONPATH (see ENV above)
 RUN uv pip install \
     dctorch \
     git+https://github.com/CompVis/taming-transformers.git
@@ -114,10 +114,11 @@ RUN cd stable-diffusion-webui && \
 
 RUN echo "--- REPOSITORIES STEP PASSED ---"
 
-# Install ldm from the local CompVis/stable-diffusion clone — same code as
-# latent-diffusion but guaranteed to have ldm/ in site-packages since we control
-# the source. Remote pip install of latent-diffusion doesn't reliably expose ldm.
-RUN uv pip install -e stable-diffusion-webui/repositories/stable-diffusion-stability-ai
+# ldm is made importable via PYTHONPATH (set in ENV above).
+# CompVis/stable-diffusion was designed for sys.path usage — it has no setup.py/
+# pyproject.toml, so pip/uv install -e does not register ldm in site-packages.
+# PYTHONPATH points Python directly at the repo root so "import ldm" resolves.
+# This is how A1111's own paths.py makes ldm importable at runtime.
 
 # prepare_environment() call removed — we've done everything it would do:
 #   - torch, xformers, CLIP, dctorch, latent-diffusion: installed via uv above
