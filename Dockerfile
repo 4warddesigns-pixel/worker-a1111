@@ -56,7 +56,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git && \
     cd stable-diffusion-webui && \
     git reset --hard ${A1111_RELEASE} && \
-    pip install --upgrade pip setuptools && \
+    pip install --upgrade pip "setuptools==68.2.2" && \
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --extra-index-url https://download.pytorch.org/whl/cu124 && \
     pip install xformers==0.0.29.post3 && \
     pip install dctorch \
