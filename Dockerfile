@@ -114,14 +114,16 @@ RUN cd stable-diffusion-webui && \
 
 RUN echo "--- REPOSITORIES STEP PASSED ---"
 
-# Run prepare_environment to complete A1111 setup.
-# --skip-torch-cuda-test: no GPU at build time
-# --skip-git-pull: repos already cloned, remote URLs spoofed above
-RUN cd stable-diffusion-webui && \
-    python -c "from launch import prepare_environment; prepare_environment()" \
-    --skip-torch-cuda-test --skip-git-pull
+# prepare_environment() call removed — we've done everything it would do:
+#   - torch, xformers, CLIP, dctorch, latent-diffusion: installed via uv above
+#   - requirements_versions.txt: installed via uv above
+#   - all repos: cloned above with correct remote URLs
+# prepare_environment() also does a git fetch to verify commit hashes against
+# the Stability-AI remote — that network call hits the now-private repo and fails
+# even with --skip-git-pull (commit hash verification is not gated by that flag).
+# Removing the call entirely is safe: everything it installs is already present.
 
-RUN echo "--- PREPARE_ENVIRONMENT STEP PASSED ---"
+RUN echo "--- PREPARE_ENVIRONMENT SKIPPED (all deps pre-installed) ---"
 
 # Verify the three modules that caused runtime failures in old approach
 RUN python -c "import ldm.modules.midas; print('OK: ldm.modules.midas')" && \
