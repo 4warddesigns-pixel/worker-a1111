@@ -51,8 +51,10 @@ RUN wget -qO- https://astral.sh/uv/install.sh | sh && \
 # Create isolated venv and put it on PATH (set in ENV above)
 RUN uv venv /opt/venv
 
-# Install pip, setuptools, wheel first — same pattern as ComfyUI worker
-RUN uv pip install pip setuptools wheel
+# Install pip, setuptools, wheel first — same pattern as ComfyUI worker.
+# setuptools pinned to 68.2.2: last version with full pkg_resources support.
+# CLIP's setup.py does "import pkg_resources" — setuptools 70+ breaks this.
+RUN uv pip install pip "setuptools==68.2.2" wheel
 
 RUN echo "--- UV + VENV STEP PASSED ---"
 
