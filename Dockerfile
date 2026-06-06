@@ -1,21 +1,25 @@
-# DOCKERFILE-TEST-UI — experimental rebuild using ComfyUI worker's approach
-# Goal: bypass all cascading pip/setuptools/CLIP ecosystem drift by switching to:
-#   - nvidia/cuda CUDA base image (not python:slim) — matches GPU environment natively
-#   - uv package manager (not pip) — handles build isolation and pkg_resources cleanly
-#   - Python 3.10 from Ubuntu 22.04 native (matches A1111 v1.9.3 tested environment)
-#   - setuptools + wheel installed from the start into a clean venv
+# DOCKERFILE-PRODUCTION-FULL — complete production Dockerfile with test markers
+# Combines Stage 1 (model download) + Stage 2 (uv/CUDA build) + worker runtime files
+# Once confirmed working on RunPod, create a clean copy without the echo markers.
 #
-# Based on pattern from runpod-workers/worker-comfyui (confirmed working on RunPod)
-# Stage 1 (model download) is omitted for test speed — identical to production
+# Stage 2 is identical to Dockerfile-test-UI.txt (the file used for fast iteration).
+# Stage 1 and the runtime section (COPY model, ADD src, CMD) are restored from the
+# last successful build: logs_72285265480 (June 4 2026).
 #
-# Build command:
-#   docker build -f Dockerfile-test-UI.txt . --progress=plain --no-cache
-#
-# Success: last lines will be import checks then --- UI APPROACH VERIFIED ---
-# Failure: docker prints the exact failing line and exits non-zero
-#
-# If this build goes green, the same Stage 2 replaces the current GitHub Dockerfile.
-# Stage 1 (wget Deliberate_v6.safetensors) and all src/ files stay unchanged.
+# GitHub repo: https://github.com/4warddesigns-pixel/worker-a1111
+# Docker Hub:  4warddesigners/worker-a1111:latest
+
+# ---------------------------------------------------------------------------- #
+#                        Stage 1: Download model                               #
+# ---------------------------------------------------------------------------- #
+FROM alpine:3 as download
+
+ARG HF_TOKEN
+
+RUN apk add --no-cache wget && \
+    wget -q --header="Authorization: Bearer ${HF_TOKEN}" \
+    -O /model.safetensors \
+    https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v6.safetensors
 
 # ---------------------------------------------------------------------------- #
 #                        Stage 2: Build the final image                        #
@@ -35,7 +39,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# System deps — same as before plus python3-venv for uv venv creation
 RUN apt-get update && \
     apt-get install -y \
     python3 python3-pip python3-venv python-is-python3 \
@@ -45,49 +48,36 @@ RUN apt-get update && \
 
 RUN echo "--- APT STEP PASSED ---"
 
-# Install uv (modern Rust-based package manager — handles build isolation cleanly)
 RUN wget -qO- https://astral.sh/uv/install.sh | sh && \
     ln -s /root/.local/bin/uv /usr/local/bin/uv
 
-# Create isolated venv and put it on PATH (set in ENV above)
 RUN uv venv /opt/venv
 
-# Install pip, setuptools, wheel first — same pattern as ComfyUI worker.
 # setuptools pinned to 68.2.2: last version with full pkg_resources support.
 # CLIP's setup.py does "import pkg_resources" — setuptools 70+ breaks this.
 RUN uv pip install pip "setuptools==68.2.2" wheel
 
 RUN echo "--- UV + VENV STEP PASSED ---"
 
-# PyTorch — explicit CUDA 12.4 build (matches base image)
 RUN uv pip install \
     torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
     --index-url https://download.pytorch.org/whl/cu124
 
-# xformers — pinned to correct build for torch 2.6.0
 RUN uv pip install xformers==0.0.29.post3
 
 RUN echo "--- TORCH STEP PASSED ---"
 
-# Pre-install packages A1111 prepare_environment installs poorly:
-#   - CLIP: old setup.py does "import pkg_resources" at line 3.
-#     uv (like pip) creates an isolated build env for source packages — that env
-#     gets its own setuptools independently of our 68.2.2 pin, and newer setuptools
-#     breaks pkg_resources in build subprocesses.
-#     --no-build-isolation forces uv to use the current venv (our pinned 68.2.2)
-#     instead of creating a fresh isolated env. Pin + no-isolation = pkg_resources works.
+# CLIP: --no-build-isolation forces uv to use our pinned setuptools (68.2.2)
+# instead of an isolated build env that gets a newer broken version.
 RUN uv pip install --no-build-isolation \
     "https://github.com/openai/CLIP/archive/d50d76daa670286dd6cacf3bcd80b5e4823fc8e1.zip"
 
-#   - dctorch, taming-transformers: install normally
-#   - ldm: NOT installed as a package — made importable via PYTHONPATH (see ENV above)
 RUN uv pip install \
     dctorch \
     git+https://github.com/CompVis/taming-transformers.git
 
 RUN echo "--- PRE-INSTALL STEP PASSED ---"
 
-# Clone A1111 and install its Python requirements
 RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git && \
     cd stable-diffusion-webui && \
     git reset --hard ${A1111_RELEASE} && \
@@ -95,12 +85,10 @@ RUN git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git && \
 
 RUN echo "--- A1111 REQUIREMENTS STEP PASSED ---"
 
-# Clone repositories A1111 needs at runtime.
 # stable-diffusion-stability-ai: cloned from CompVis/latent-diffusion (parent framework,
 #   has full ldm including ldm/modules/midas/ — CompVis/stable-diffusion lacks midas).
 #   Remote URL spoofed to Stability-AI so prepare_environment URL check passes.
-# generative-models: not needed for SD 1.x — stub git repo with correct remote
-#   so prepare_environment URL check passes without fetching.
+# generative-models: SD 2.x only — stub satisfies A1111 directory existence check.
 RUN cd stable-diffusion-webui && \
     mkdir -p repositories && \
     git clone --depth 1 https://github.com/AUTOMATIC1111/stable-diffusion-webui-assets repositories/stable-diffusion-webui-assets && \
@@ -115,35 +103,36 @@ RUN cd stable-diffusion-webui && \
 
 RUN echo "--- REPOSITORIES STEP PASSED ---"
 
-# ldm/modules/midas was added by Stability-AI for SD2 depth conditioning and only
-# lives in their now-private repo. Neither CompVis/stable-diffusion nor
-# CompVis/latent-diffusion has it. A1111 imports it unconditionally at module level
-# but never calls it for SD1.x (Deliberate v6) generation — a stub satisfies the import.
+# ldm/modules/midas: Stability-AI addition for SD2 depth conditioning — not in any
+# public CompVis repo. A1111 imports it unconditionally but never uses it for SD1.x.
 RUN mkdir -p stable-diffusion-webui/repositories/stable-diffusion-stability-ai/ldm/modules/midas && \
     touch stable-diffusion-webui/repositories/stable-diffusion-stability-ai/ldm/modules/midas/__init__.py
 
 RUN echo "--- MIDAS STUB CREATED ---"
 
-# ldm is made importable via PYTHONPATH (set in ENV above).
-# We clone CompVis/latent-diffusion (not stable-diffusion) because it has the full
-# ldm package including ldm/modules/midas/ which A1111 imports unconditionally.
-# CompVis/stable-diffusion lacks midas. PYTHONPATH points Python at the repo root.
-
-# prepare_environment() call removed — we've done everything it would do:
-#   - torch, xformers, CLIP, dctorch, latent-diffusion: installed via uv above
-#   - requirements_versions.txt: installed via uv above
-#   - all repos: cloned above with correct remote URLs
-# prepare_environment() also does a git fetch to verify commit hashes against
-# the Stability-AI remote — that network call hits the now-private repo and fails
-# even with --skip-git-pull (commit hash verification is not gated by that flag).
-# Removing the call entirely is safe: everything it installs is already present.
-
+# prepare_environment() removed: everything it installs is pre-installed above.
+# It also does a git fetch against the now-private Stability-AI remote which fails
+# even with --skip-git-pull (commit hash check is not gated by that flag).
 RUN echo "--- PREPARE_ENVIRONMENT SKIPPED (all deps pre-installed) ---"
 
-# Verify the three modules that caused runtime failures in old approach
+# Verify critical imports before baking the model in — fail fast if ldm is broken.
 RUN python -c "import ldm.modules.midas; print('OK: ldm.modules.midas')" && \
     python -c "import dctorch; print('OK: dctorch')" && \
     python -c "import xformers; print('OK: xformers', xformers.__version__)" && \
     python -c "import clip; print('OK: clip')"
 
 RUN echo "--- UI APPROACH VERIFIED ---"
+
+# ---------------------------------------------------------------------------- #
+#                        Runtime: model + worker files                         #
+# ---------------------------------------------------------------------------- #
+COPY --from=download /model.safetensors /model.safetensors
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY test_input.json .
+ADD src .
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
