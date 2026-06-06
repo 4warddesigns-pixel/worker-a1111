@@ -35,7 +35,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     GIT_TERMINAL_PROMPT=0 \
     GIT_ASKPASS=/bin/echo \
     PATH="/opt/venv/bin:${PATH}" \
-    PYTHONPATH="/stable-diffusion-webui/repositories/stable-diffusion-stability-ai"
+    PYTHONPATH="/stable-diffusion-webui/repositories/stable-diffusion-stability-ai:/stable-diffusion-webui/repositories/generative-models"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -110,6 +110,16 @@ RUN mkdir -p stable-diffusion-webui/repositories/stable-diffusion-stability-ai/l
 
 RUN echo "--- MIDAS STUB CREATED ---"
 
+# sgm/modules/encoders/modules: Stability-AI generative-models package — needed for SDXL
+# but imported unconditionally by A1111 v1.9.3 initialize.py line 32. SD1.x never calls it.
+RUN mkdir -p stable-diffusion-webui/repositories/generative-models/sgm/modules/encoders && \
+    touch stable-diffusion-webui/repositories/generative-models/sgm/__init__.py && \
+    touch stable-diffusion-webui/repositories/generative-models/sgm/modules/__init__.py && \
+    touch stable-diffusion-webui/repositories/generative-models/sgm/modules/encoders/__init__.py && \
+    touch stable-diffusion-webui/repositories/generative-models/sgm/modules/encoders/modules.py
+
+RUN echo "--- SGM STUB CREATED ---"
+
 # prepare_environment() removed: everything it installs is pre-installed above.
 # It also does a git fetch against the now-private Stability-AI remote which fails
 # even with --skip-git-pull (commit hash check is not gated by that flag).
@@ -117,6 +127,7 @@ RUN echo "--- PREPARE_ENVIRONMENT SKIPPED (all deps pre-installed) ---"
 
 # Verify critical imports before baking the model in — fail fast if ldm is broken.
 RUN python -c "import ldm.modules.midas; print('OK: ldm.modules.midas')" && \
+    python -c "import sgm.modules.encoders.modules; print('OK: sgm.modules.encoders.modules')" && \
     python -c "import dctorch; print('OK: dctorch')" && \
     python -c "import xformers; print('OK: xformers', xformers.__version__)" && \
     python -c "import clip; print('OK: clip')"
