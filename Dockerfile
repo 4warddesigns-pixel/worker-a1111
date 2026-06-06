@@ -17,7 +17,7 @@ FROM alpine:3 as download
 ARG HF_TOKEN
 
 RUN apk add --no-cache wget && \
-    wget -q --header="Authorization: Bearer ${HF_TOKEN}" \
+    wget --server-response --header="Authorization: Bearer ${HF_TOKEN}" \
     -O /model.safetensors \
     https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v6.safetensors
 
