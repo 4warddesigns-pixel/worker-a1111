@@ -1,11 +1,118 @@
-{
-  "input": {
-    "prompt": "a photo of an astronaut riding a horse on mars",
-    "negative_prompt": "blurry, bad quality",
+"""
+Test the A1111 RunPod worker.
+
+Usage:
+  python test_a1111.py <ENDPOINT_ID> <API_KEY>
+
+The endpoint must be running the worker built from customWorker/worker-a1111-main/Dockerfile.
+A1111 returns: {"images": ["<raw_base64>"], "info": "...", "parameters": {...}}
+
+On success: saves output.png and prints "PASS".
+On failure: prints the full raw response and exits with code 1.
+"""
+
+import sys
+import json
+import time
+import base64
+import urllib.request
+import urllib.error
+
+TIMEOUT_SECONDS = 300
+POLL_INTERVAL = 5
+
+TEST_INPUT = {
+    "prompt": "1980s cinematic film still, action hero standing in a rain-soaked alley, neon reflections on wet pavement, 35mm grain, photorealistic",
+    "negative_prompt": "cgi, 3d render, cartoon, anime, blurry, watermark, text",
     "width": 512,
     "height": 512,
-    "num_inference_steps": 20,
-    "guidance_scale": 7.5,
-    "seed": 42
-  }
+    "steps": 20,
+    "cfg_scale": 7.5,
+    "sampler_name": "Euler a",
+    "seed": 42,
+    "batch_size": 1,
 }
+
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: python test_a1111.py <ENDPOINT_ID> <API_KEY>")
+        sys.exit(1)
+
+    endpoint_id, api_key = sys.argv[1], sys.argv[2]
+    base_url = f"https://api.runpod.io/v2/{endpoint_id}"
+
+    payload = json.dumps({"input": TEST_INPUT}).encode()
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+
+    # Submit job
+    print(f"Submitting job to {base_url}/run ...")
+    req = urllib.request.Request(f"{base_url}/run", data=payload, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            submit = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        print(f"FAIL — HTTP {e.code} on submit:\n{body}")
+        sys.exit(1)
+
+    job_id = submit.get("id")
+    if not job_id:
+        print(f"FAIL — no job id in submit response:\n{json.dumps(submit, indent=2)}")
+        sys.exit(1)
+
+    print(f"Job id: {job_id}")
+
+    # Poll for result
+    status_url = f"{base_url}/status/{job_id}"
+    elapsed = 0
+    result = {}
+    while elapsed < TIMEOUT_SECONDS:
+        time.sleep(POLL_INTERVAL)
+        elapsed += POLL_INTERVAL
+
+        req = urllib.request.Request(status_url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")
+            print(f"FAIL — HTTP {e.code} on poll:\n{body}")
+            sys.exit(1)
+
+        status = result.get("status")
+        print(f"  [{elapsed:>3}s] status={status}")
+
+        if status == "COMPLETED":
+            output = result.get("output", {})
+            # A1111 returns {"images": ["<raw_b64>"], ...}
+            images = output.get("images", [])
+            if not images:
+                print(f"FAIL — status=COMPLETED but no images in output:\n{json.dumps(result, indent=2)}")
+                sys.exit(1)
+
+            b64 = images[0]
+            if not isinstance(b64, str):
+                print(f"FAIL — unexpected image type {type(b64)}:\n{json.dumps(result, indent=2)}")
+                sys.exit(1)
+
+            with open("output.png", "wb") as f:
+                f.write(base64.b64decode(b64))
+
+            print("PASS — saved output.png")
+            return
+
+        if status in ("FAILED", "CANCELLED"):
+            print(f"FAIL — job ended with status={status}:\n{json.dumps(result, indent=2)}")
+            sys.exit(1)
+
+    print(f"FAIL — timed out after {TIMEOUT_SECONDS}s, last status={status}")
+    print(json.dumps(result, indent=2))
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
